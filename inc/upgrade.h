@@ -108,6 +108,7 @@ private:
     void upgradeComplete(bool success, const QString &message);
     void resetState();
     void updateProgress();
+    QString failureMessageForFlag(BootLoaderProtocol::ResponseFlag flag) const;
 
     MainWindow *mainWindow;
     BootLoaderProtocol protocol;

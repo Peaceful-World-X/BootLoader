@@ -291,8 +291,11 @@ bool BootLoaderProtocol::parseFrame(const QByteArray &frame, quint8 &slaveId, Me
     flag = static_cast<ResponseFlag>(frame[6]);
 
     // 提取命令数据
-    if (frame.size() > 10) {
-        payload = frame.mid(7, frame.size() - 9);
+    // 帧结构: 帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N) + CRC(2)
+    // 最小帧长度为9字节(无数据)，有数据时为9+N字节
+    int dataLength = frame.size() - 9;  // 减去除数据外的所有字段
+    if (dataLength > 0) {
+        payload = frame.mid(7, dataLength);
     } else {
         payload.clear();
     }

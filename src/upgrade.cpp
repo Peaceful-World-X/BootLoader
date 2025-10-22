@@ -2,7 +2,6 @@
 #include "inc/mainwindow.h"
 #include <QFile>
 #include <QMessageBox>
-#include <QDateTime>
 #include <limits>
 
 UpgradeManager::UpgradeManager(MainWindow *parent)
@@ -47,8 +46,7 @@ bool UpgradeManager::startUpgrade(quint8 slaveId, int packetSize, bool upgradeFP
     currentFirmwareIndex = -1;
 
     emit showInfo(tr("========================================"));
-    emit showInfo(tr(">>> 开始升级流程 %1").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss")));
-    emit showInfo(tr("========================================"));
+    emit showInfo(tr(">>> 开始升级流程"));
 
     // 发送升级请求
     sendUpgradeRequest();
@@ -132,7 +130,7 @@ bool UpgradeManager::prepareFirmware(int packetSize, bool upgradeFPGA, bool upgr
         firmwareList.append(info);
         totalPackets += info.packetCount;
 
-        emit showInfo(tr(">>> 加载 %1 固件: %2 字节, %3 包, CRC16=0x%4")
+        emit showInfo(tr("加载 %1 固件: %2 字节, %3 包, CRC16=0x%4")
             .arg(dev.name)
             .arg(info.fileSize)
             .arg(info.packetCount)
@@ -221,9 +219,7 @@ void UpgradeManager::startDeviceUpgrade(DeviceType device)
         case DeviceType::ARM: deviceName = "ARM"; break;
     }
 
-    emit showInfo(tr(">>> 准备升级 %1 %2")
-        .arg(deviceName)
-        .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss")));
+    emit showInfo(tr("\n>>> 准备升级 %1").arg(deviceName));
 
     firmwareList[currentFirmwareIndex].currentPacket = 0;
 
@@ -425,8 +421,36 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
                 }
 
                 if (msgType == expectedType) {
-                    if (flag == BootLoaderProtocol::ResponseFlag::SUCCESS &&
-                        !payload.isEmpty() && payload[0] == 0x00) {
+                    if (flag == BootLoaderProtocol::ResponseFlag::SUCCESS) {
+                        if (payload.size() < 5) {
+                            upgradeComplete(false, tr("数据传输失败：应答长度异常"));
+                            return;
+                        }
+
+                        const quint8 status = static_cast<quint8>(payload[0]);
+                        const quint16 packetNum = static_cast<quint16>((static_cast<quint8>(payload[1]) << 8) |
+                                                                       static_cast<quint8>(payload[2]));
+                        const quint16 receivedCount = static_cast<quint16>((static_cast<quint8>(payload[3]) << 8) |
+                                                                            static_cast<quint8>(payload[4]));
+                        const quint16 expectedPacket = fw.currentPacket + 1;
+
+                        if (status != 0x00) {
+                            upgradeComplete(false, tr("数据传输失败：目标设备上报错误状态"));
+                            return;
+                        }
+
+                        if (packetNum != expectedPacket) {
+                            upgradeComplete(false, tr("数据传输失败：包序号不匹配 (期望 %1, 实际 %2)")
+                                                           .arg(expectedPacket)
+                                                           .arg(packetNum));
+                            return;
+                        }
+
+                        if (receivedCount < packetNum || receivedCount > fw.packetCount) {
+                            upgradeComplete(false, tr("数据传输失败：目标设备接收计数异常"));
+                            return;
+                        }
+
                         fw.currentPacket++;
                         sentPackets++;
 
@@ -439,7 +463,9 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
                             sendUpgradeEnd();
                         }
                     } else {
-                        upgradeComplete(false, tr("数据传输失败"));
+                        const QString reason = failureMessageForFlag(flag);
+                        upgradeComplete(false, tr("数据传输失败：%1").arg(reason));
+                        return;
                     }
                 }
             }
@@ -460,26 +486,32 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
                 }
 
                 if (msgType == expectedType) {
-                    bool success = (flag == BootLoaderProtocol::ResponseFlag::UPGRADE_END ||
-                                   flag == BootLoaderProtocol::ResponseFlag::FPGA_CONFIG_SUCCESS) &&
-                                  (!payload.isEmpty() && payload[0] == 0x00);
+                    const bool successFlag = (flag == BootLoaderProtocol::ResponseFlag::UPGRADE_END ||
+                                              flag == BootLoaderProtocol::ResponseFlag::FPGA_CONFIG_SUCCESS);
 
-                    if (success) {
-                        emit showInfo(tr(">>> 设备升级完成"));
+                    if (successFlag) {
+                        if (!payload.isEmpty() && static_cast<quint8>(payload[0]) == 0x00) {
+                            emit showInfo(tr(">>> 设备升级完成"));
 
-                        // 升级下一个设备
-                        DeviceType nextDevice = DeviceType::FPGA;
-                        switch (fw.deviceType) {
-                            case DeviceType::FPGA: nextDevice = DeviceType::DSP1; break;
-                            case DeviceType::DSP1: nextDevice = DeviceType::DSP2; break;
-                            case DeviceType::DSP2: nextDevice = DeviceType::ARM; break;
-                            case DeviceType::ARM:
-                                sendTotalEnd();
-                                return;
+                            // 升级下一个设备
+                            DeviceType nextDevice = DeviceType::FPGA;
+                            switch (fw.deviceType) {
+                                case DeviceType::FPGA: nextDevice = DeviceType::DSP1; break;
+                                case DeviceType::DSP1: nextDevice = DeviceType::DSP2; break;
+                                case DeviceType::DSP2: nextDevice = DeviceType::ARM; break;
+                                case DeviceType::ARM:
+                                    sendTotalEnd();
+                                    return;
+                            }
+                            startDeviceUpgrade(nextDevice);
+                        } else {
+                            upgradeComplete(false, tr("设备升级校验失败：目标设备状态异常"));
+                            return;
                         }
-                        startDeviceUpgrade(nextDevice);
                     } else {
-                        upgradeComplete(false, tr("设备升级校验失败"));
+                        const QString reason = failureMessageForFlag(flag);
+                        upgradeComplete(false, tr("设备升级失败：%1").arg(reason));
+                        return;
                     }
                 }
             }
@@ -487,7 +519,17 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
 
         case UpgradeState::WAIT_TOTAL_END:
             if (msgType == BootLoaderProtocol::MessageType::TOTAL_END) {
-                upgradeComplete(true, tr("所有设备升级成功"));
+                if (flag == BootLoaderProtocol::ResponseFlag::SUCCESS) {
+                    if (!payload.isEmpty() && static_cast<quint8>(payload[0]) == 0x00) {
+                        upgradeComplete(true, tr("所有设备升级成功"));
+                    } else {
+                        upgradeComplete(false, tr("总体结束失败：目标设备状态异常"));
+                    }
+                } else {
+                    const QString reason = failureMessageForFlag(flag);
+                    upgradeComplete(false, tr("总体结束失败：%1").arg(reason));
+                }
+                return;
             }
             break;
 
@@ -552,13 +594,11 @@ void UpgradeManager::upgradeComplete(bool success, const QString &message)
 
     if (success) {
         upgradeState = UpgradeState::UPGRADE_SUCCESS;
-        emit showInfo(tr("========================================"));
-        emit showInfo(tr(">>> 升级完成！%1").arg(message));
+        emit showInfo(tr("\n>>> 升级完成！%1").arg(message));
         emit showInfo(tr("========================================"));
     } else {
         upgradeState = UpgradeState::UPGRADE_FAILED;
-        emit showInfo(tr("========================================"));
-        emit showInfo(tr(">>> 升级失败：%1").arg(message));
+        emit showInfo(tr("\n>>> 升级失败：%1").arg(message));
         emit showInfo(tr("========================================"));
     }
 
@@ -596,6 +636,41 @@ void UpgradeManager::updateProgress()
     int totalProgress = totalPackets > 0 ? (sentPackets * 100) / totalPackets : 0;
 
     emit progressUpdated(currentProgress, totalProgress);
+}
+
+QString UpgradeManager::failureMessageForFlag(BootLoaderProtocol::ResponseFlag flag) const
+{
+    switch (flag) {
+        case BootLoaderProtocol::ResponseFlag::FAILED:
+            return tr("命令执行失败");
+        case BootLoaderProtocol::ResponseFlag::CRC_ERROR:
+        case BootLoaderProtocol::ResponseFlag::DATA_CRC_ERROR:
+            return tr("数据校验错误");
+        case BootLoaderProtocol::ResponseFlag::TIMEOUT:
+            return tr("接收超时");
+        case BootLoaderProtocol::ResponseFlag::FORBID_UPGRADE:
+            return tr("禁止升级");
+        case BootLoaderProtocol::ResponseFlag::ERASE_FAILED:
+            return tr("擦除Flash失败");
+        case BootLoaderProtocol::ResponseFlag::RESTART_FAILED:
+            return tr("重启失败");
+        case BootLoaderProtocol::ResponseFlag::SIZE_ERROR:
+            return tr("数据大小出错");
+        case BootLoaderProtocol::ResponseFlag::FLASH_WRITE_FAILED:
+            return tr("Flash数据写入失败");
+        case BootLoaderProtocol::ResponseFlag::FPGA_CONFIG_FAILED:
+            return tr("FPGA配置失败");
+        case BootLoaderProtocol::ResponseFlag::FPGA_FILE_DAMAGED:
+            return tr("FPGA配置文件损坏");
+        case BootLoaderProtocol::ResponseFlag::FPGA_STATUS_ERROR:
+            return tr("FPGA状态异常");
+        case BootLoaderProtocol::ResponseFlag::FPGA_FLAG_WRITE_FAILED:
+            return tr("写FPGA固件标志位失败");
+        case BootLoaderProtocol::ResponseFlag::PACKET_SIZE_EXCEED:
+            return tr("数据包大小超限");
+        default:
+            return BootLoaderProtocol::getResponseDescription(flag);
+    }
 }
 
 /**

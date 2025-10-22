@@ -16,7 +16,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 设置日志文件路径（主程序同目录）
     QString appDir = QCoreApplication::applicationDirPath();
-    logFilePath = appDir + "/bootloader_log.txt";
+    logFilePath = appDir + "/bootloader.log";
 
     // 枚举可用串口
     populateSerialPorts();
@@ -52,29 +52,28 @@ MainWindow::~MainWindow()
 }
 
 /* ===============================  通信函数 ======================================= */
+// 辅助函数：计算字符串显示宽度并填充到指定宽度（中文字符算2个宽度）
+static QString padString(const QString &str, int targetWidth)
+{
+    int displayWidth = 0;
+    for (const QChar &ch : str) {
+        if (ch.unicode() > 0x7F) {  // 非ASCII字符（包括中文）
+            displayWidth += 2;
+        } else {
+            displayWidth += 1;
+        }
+    }
+    int paddingNeeded = targetWidth - displayWidth;
+    return str + QString(paddingNeeded > 0 ? paddingNeeded : 0, ' ');
+}
+
 void MainWindow::handleDataReceived(const QByteArray &frame, quint8 slaveId, BootLoaderProtocol::MessageType msgType, BootLoaderProtocol::ResponseFlag flag, const QByteArray &payload)
 {
     const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-
     const QString typeDesc = BootLoaderProtocol::getMessageTypeDescription(msgType);
     const QString flagDesc = BootLoaderProtocol::getResponseDescription(flag);
 
-    // 只显示getResponseDescription的内容，但SUCCESS和FAILED不显示
-    if (flag != BootLoaderProtocol::ResponseFlag::SUCCESS &&
-        flag != BootLoaderProtocol::ResponseFlag::FAILED) {
-        QString infoLine = QStringLiteral("[%1] %2")
-            .arg(timestamp, flagDesc);
-        appendInfoDisplay(infoLine);
-    }
-
-    const bool hasPayload = !payload.isEmpty();
-    QString payloadPreview;
-    if (hasPayload) {
-        payloadPreview = toPrintable(payload);
-        appendInfoDisplay(QString("    数据: %1").arg(payloadPreview));
-    }
-
-    // 如果勾选了日志记录，写入详细信息
+    // 如果勾选了日志记录，写入详细信息到文件
     if (ui->checkBox_log->isChecked()) {
         // 限制显示前20个字节
         QByteArray displayData = frame.size() > 20 ? frame.left(20) : frame;
@@ -84,21 +83,21 @@ void MainWindow::handleDataReceived(const QByteArray &frame, quint8 slaveId, Boo
         }
 
         // 格式: [时间] | RX | ID=xx | TYPE=类型描述 | FLAG=标志描述 | DATA=十六进制
-        writeToLogFile(QStringLiteral("[%1] | RX | ID=%2 | TYPE=%3 | FLAG=%4 | DATA=%5")
-            .arg(timestamp)
-            .arg(slaveId, 2, 10, QLatin1Char('0'))
-            .arg(typeDesc.leftJustified(14, QLatin1Char(' ')))
-            .arg(flagDesc.leftJustified(18, QLatin1Char(' ')))
-            .arg(hexData));
+        // 手动填充以支持中文对齐（TYPE=24字符宽度，FLAG=34字符宽度）
+        QString typePadded = padString(typeDesc, 24);
+        QString flagPadded = padString(flagDesc, 34);
 
-        if (hasPayload) {
-            writeToLogFile(QStringLiteral("  PAYLOAD: %1").arg(payloadPreview));
-        }
+        QString logLine = QString("[%1] | RX | ID=%2 | TYPE=%3 | FLAG=%4 | DATA=%5")
+            .arg(timestamp)
+            .arg(slaveId, 2, 10, QChar('0'))
+            .arg(typePadded)
+            .arg(flagPadded)
+            .arg(hexData);
+        writeToLogFile(logLine);
     }
 
-    // 如果正在升级流程中，处理响应（调试报文除外）
-    if (upgradeManager->currentState() != UpgradeManager::UpgradeState::IDLE &&
-        msgType != BootLoaderProtocol::MessageType::DEBUG_INFO) {
+    // 如果正在升级流程中，处理响应（包括调试报文，用于重置超时计时器）
+    if (upgradeManager->currentState() != UpgradeManager::UpgradeState::IDLE) {
         upgradeManager->handleResponse(msgType, flag, payload);
     }
 }
@@ -107,7 +106,7 @@ void MainWindow::handleSerialError(const QString &errorMessage)
 {
     const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
     const QString message = tr("串口错误：%1").arg(errorMessage);
-    appendInfoDisplay(QString("[%1] 错误: %2").arg(timestamp, message));
+    appendInfoDisplay(message);
     statusBar()->showMessage(message);
     ui->pushButton_LJ->setEnabled(true);
     QMessageBox::critical(this, tr("串口错误"), message);
@@ -117,7 +116,7 @@ void MainWindow::handleTcpError(const QString &errorMessage)
 {
     const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
     const QString message = tr("网口错误：%1").arg(errorMessage);
-    appendInfoDisplay(QString("[%1] 错误: %2").arg(timestamp, message));
+    appendInfoDisplay(message);
     statusBar()->showMessage(message);
     ui->pushButton_LJ->setEnabled(true);
     QMessageBox::critical(this, tr("网口错误"), message);
@@ -148,11 +147,11 @@ void MainWindow::handleConnectionStateChanged(bool connected)
                                 .arg(ui->lineEdit_port->text().trimmed());
         }
 
-        appendInfoDisplay(QStringLiteral("[%1] %2").arg(timestamp, statusMessage));
+        appendInfoDisplay(statusMessage);
         applyConnectedState(true, statusMessage);
     } else {
         const QString statusMessage = wasConnected ? tr("连接已断开") : tr("连接未建立");
-        appendInfoDisplay(QStringLiteral("[%1] %2").arg(timestamp, statusMessage));
+        appendInfoDisplay(statusMessage);
         applyConnectedState(false, statusMessage);
     }
 }
@@ -297,12 +296,7 @@ void MainWindow::sendData(const QByteArray &data, const QString &description)
     qint64 bytesWritten = commManager->sendData(data);
 
     if (bytesWritten > 0) {
-        // 显示到 info_display
-        if (!description.isEmpty()) {
-            appendInfoDisplay(QString("[%1] 发送: %2").arg(timestamp, description));
-        }
-
-        // 如果勾选了日志记录,写入文件
+        // 如果勾选了日志记录,写入文件（但不显示到界面）
         if (ui->checkBox_log->isChecked()) {
             QByteArray displayData = data.size() > 20 ? data.left(20) : data;   // 限制显示前20个字节
             QString hexData = QString::fromLatin1(displayData.toHex(' ').toUpper());
@@ -316,15 +310,21 @@ void MainWindow::sendData(const QByteArray &data, const QString &description)
                 deviceId = static_cast<quint8>(data[2]);
             }
 
-            // 格式: [时间] | TX | ID=xx | TYPE=描述 | DATA=十六进制
-            writeToLogFile(QStringLiteral("[%1] | TX | ID=%2 | TYPE=%3 | DATA=%4")
+            // 格式: [时间] | TX | ID=xx | TYPE=描述 | FLAG=(空) | DATA=十六进制
+            // 手动填充以支持中文对齐（TYPE=24字符宽度，FLAG=34字符宽度）
+            QString typePadded = padString(typeStr, 24);
+            QString flagPadded = padString("", 34);
+
+            QString logLine = QString("[%1] | TX | ID=%2 | TYPE=%3 | FLAG=%4 | DATA=%5")
                 .arg(timestamp)
-                .arg(deviceId, 2, 10, QLatin1Char('0'))
-                .arg(typeStr.leftJustified(16, QLatin1Char(' ')))
-                .arg(hexData));
+                .arg(deviceId, 2, 10, QChar('0'))
+                .arg(typePadded)
+                .arg(flagPadded)
+                .arg(hexData);
+            writeToLogFile(logLine);
         }
     } else {
-        appendInfoDisplay(QString("[%1] 发送失败").arg(timestamp));
+        appendInfoDisplay(tr("发送失败"));
         if (ui->checkBox_log->isChecked()) {
             writeToLogFile(QString("[%1] | TX | 发送失败").arg(timestamp));
         }
@@ -566,6 +566,12 @@ void MainWindow::on_link_currentIndexChanged(int index)
     } else {
         statusBar()->showMessage(tr("已选择网口模式"));
     }
+}
+
+// 日志窗口清屏
+void MainWindow::on_pushButton_clicked()
+{
+    ui->info_display->setText("");
 }
 
 

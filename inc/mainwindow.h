@@ -54,6 +54,8 @@ private slots:
     void onUpgradeProgressUpdated(int currentDevice, int totalDevice);
     void onUpgradeFinished(bool success, const QString &message);
 
+    void on_pushButton_clicked();
+
 private:
     void populateSerialPorts();
     bool openSerialPort();
