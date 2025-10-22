@@ -65,6 +65,7 @@ private slots:
     void handleSerialError(QSerialPort::SerialPortError error);
 
     // 网口数据接收
+    void handleTcpConnected();
     void handleTcpReadyRead();
     void handleTcpError(QAbstractSocket::SocketError error);
 

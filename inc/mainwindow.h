@@ -18,10 +18,13 @@
 
 #include "communication.h"
 #include "protocol.h"
+#include "upgrade.h"
 
 namespace Ui {
 class MainWindow;
 }
+
+class UpgradeManager; // 前向声明
 
 class MainWindow : public QMainWindow
 {
@@ -47,6 +50,10 @@ private slots:
     void on_pushButton_SJ_clicked();
     void on_link_currentIndexChanged(int index);
 
+    // 升级管理器信号槽
+    void onUpgradeProgressUpdated(int currentDevice, int totalDevice);
+    void onUpgradeFinished(bool success, const QString &message);
+
 private:
     void populateSerialPorts();
     bool openSerialPort();
@@ -57,10 +64,13 @@ private:
     void appendInfoDisplay(const QString &text);
     void writeToLogFile(const QString &text);
     void sendData(const QByteArray &data, const QString &description = QString());
+    QString toPrintable(const QByteArray &data) const;
     void selectFirmwareFile(QLineEdit *lineEdit, QCheckBox *checkBox, const QString &title, const QString &filter);
+    quint8 getSlaveId() const;
 
     Ui::MainWindow *ui;
     CommunicationManager *commManager;
+    UpgradeManager *upgradeManager;
     bool isConnected;
     QString logFilePath;
 };

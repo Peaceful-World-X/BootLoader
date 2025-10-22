@@ -13,6 +13,7 @@ CommunicationManager::CommunicationManager(QObject *parent)
     connect(&serialPort, &QSerialPort::errorOccurred, this, &CommunicationManager::handleSerialError);
 
     // 连接网口信号
+    connect(&tcpSocket, &QTcpSocket::connected, this, &CommunicationManager::handleTcpConnected);
     connect(&tcpSocket, &QTcpSocket::readyRead, this, &CommunicationManager::handleTcpReadyRead);
     connect(&tcpSocket, &QTcpSocket::errorOccurred, this, &CommunicationManager::handleTcpError);
 }
@@ -70,20 +71,13 @@ bool CommunicationManager::isSerialPortOpen() const
 
 bool CommunicationManager::openTcpConnection(const QString &host, quint16 port)
 {
-    if (tcpSocket.state() == QAbstractSocket::ConnectedState) {
-        closeTcpConnection();
+    if (tcpSocket.state() == QAbstractSocket::ConnectedState ||
+        tcpSocket.state() == QAbstractSocket::ConnectingState) {
+        tcpSocket.abort();
     }
 
     tcpSocket.connectToHost(host, port);
-
-    if (tcpSocket.waitForConnected(3000)) {
-        activeLink = LinkType::Ethernet;
-        emit connectionStateChanged(true);
-        return true;
-    } else {
-        emit tcpError(tcpSocket.errorString());
-        return false;
-    }
+    return true; // 连接结果通过信号异步通知
 }
 
 void CommunicationManager::closeTcpConnection()
@@ -93,6 +87,9 @@ void CommunicationManager::closeTcpConnection()
         if (tcpSocket.state() != QAbstractSocket::UnconnectedState) {
             tcpSocket.waitForDisconnected(1000);
         }
+        emit connectionStateChanged(false);
+    } else if (tcpSocket.state() == QAbstractSocket::ConnectingState) {
+        tcpSocket.abort();
         emit connectionStateChanged(false);
     }
 }
@@ -161,6 +158,12 @@ void CommunicationManager::handleSerialError(QSerialPort::SerialPortError error)
 // 网口数据接收处理
 // ========================================================================
 
+void CommunicationManager::handleTcpConnected()
+{
+    activeLink = LinkType::Ethernet;
+    emit connectionStateChanged(true);
+}
+
 void CommunicationManager::handleTcpReadyRead()
 {
     const QByteArray data = tcpSocket.readAll();
@@ -181,6 +184,8 @@ void CommunicationManager::handleTcpError(QAbstractSocket::SocketError error)
     if (tcpSocket.state() == QAbstractSocket::ConnectedState ||
         error == QAbstractSocket::RemoteHostClosedError) {
         closeTcpConnection();
+    } else {
+        emit connectionStateChanged(false);
     }
 }
 

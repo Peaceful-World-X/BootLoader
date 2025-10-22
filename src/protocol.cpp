@@ -1,5 +1,10 @@
 // protocol.cpp
 #include "inc/protocol.h"
+#include <QDebug>
+
+namespace {
+constexpr quint16 MIN_FRAME_SIZE = 9;
+}
 
 /**
  * @brief 构造函数
@@ -36,7 +41,8 @@ quint16 BootLoaderProtocol::calculateCRC16(const QByteArray &data)
 QByteArray BootLoaderProtocol::buildMasterFrame(quint8 slaveId, MessageType type, ResponseFlag flag, const QByteArray &payload)
 {
     QByteArray frame;
-    quint16 length = 8 + payload.size();  // 报文总长度
+    // 报文总长度 = 帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N) + CRC(2)
+    quint16 length = 9 + payload.size();
 
     // 帧头
     frame.append(static_cast<char>(MASTER_HEADER1));
@@ -58,9 +64,9 @@ QByteArray BootLoaderProtocol::buildMasterFrame(quint8 slaveId, MessageType type
     // 命令数据
     frame.append(payload);
 
-    // 计算CRC（从ID开始）
-    QByteArray crcData = frame.mid(2);
-    quint16 crc = calculateCRC16(crcData);
+    // 计算CRC（从帧头开始到数据结束，不包含CRC本身）
+    // CRC校验范围：帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N)
+    quint16 crc = calculateCRC16(frame);
 
     // CRC（高位在前）
     frame.append(static_cast<char>((crc >> 8) & 0xFF));
@@ -75,7 +81,8 @@ QByteArray BootLoaderProtocol::buildMasterFrame(quint8 slaveId, MessageType type
 QByteArray BootLoaderProtocol::buildSlaveFrame(quint8 slaveId, MessageType type, ResponseFlag flag, const QByteArray &payload)
 {
     QByteArray frame;
-    quint16 length = 8 + payload.size();
+    // 报文总长度 = 帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N) + CRC(2)
+    quint16 length = 9 + payload.size();
 
     // 帧头（下位机是0x55 0xAA）
     frame.append(static_cast<char>(SLAVE_HEADER1));
@@ -97,9 +104,9 @@ QByteArray BootLoaderProtocol::buildSlaveFrame(quint8 slaveId, MessageType type,
     // 命令数据
     frame.append(payload);
 
-    // 计算CRC
-    QByteArray crcData = frame.mid(2);
-    quint16 crc = calculateCRC16(crcData);
+    // 计算CRC（从帧头开始到数据结束，不包含CRC本身）
+    // CRC校验范围：帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N)
+    quint16 crc = calculateCRC16(frame);
 
     // CRC（高位在前）
     frame.append(static_cast<char>((crc >> 8) & 0xFF));
@@ -229,10 +236,17 @@ QList<QByteArray> BootLoaderProtocol::parseReceivedData(const QByteArray &data)
             break;
         }
 
-        // 获取报文长度
+        // 获取报文长度（长度字段表示整个报文的总字节数）
         quint16 length = (static_cast<quint8>(m_receiveBuffer[3]) << 8) |
                          static_cast<quint8>(m_receiveBuffer[4]);
-        quint16 totalLength = length + 4;  // 加上2字节帧头和2字节CRC
+        if (length < MIN_FRAME_SIZE) {
+            qWarning().noquote() << QStringLiteral("BootLoaderProtocol: invalid frame length %1, dropping header")
+                                        .arg(length);
+            const int removeCount = m_receiveBuffer.size() >= 2 ? 2 : m_receiveBuffer.size();
+            m_receiveBuffer.remove(0, removeCount);
+            continue;
+        }
+        quint16 totalLength = length;  // 长度字段已经包含了所有内容
 
         // 检查完整帧是否接收完毕
         if (m_receiveBuffer.size() < totalLength) {
@@ -255,13 +269,19 @@ bool BootLoaderProtocol::parseFrame(const QByteArray &frame, quint8 &slaveId, Me
         return false;
     }
 
-    // 验证CRC
-    QByteArray crcData = frame.mid(2, frame.size() - 4);
+    // 验证CRC（CRC校验范围：从帧头到数据结束，不包含最后2字节CRC）
+    QByteArray crcData = frame.left(frame.size() - 2);
     quint16 calculatedCRC = calculateCRC16(crcData);
     quint16 receivedCRC = (static_cast<quint8>(frame[frame.size() - 2]) << 8) |
                           static_cast<quint8>(frame[frame.size() - 1]);
 
     if (calculatedCRC != receivedCRC) {
+        const quint8 typeValue = frame.size() > 5 ? static_cast<quint8>(frame[5]) : 0x00;
+        const quint8 flagValue = frame.size() > 6 ? static_cast<quint8>(frame[6]) : 0x00;
+        qWarning().noquote() << QStringLiteral("BootLoaderProtocol: CRC mismatch (type=0x%1 flag=0x%2 len=%3)")
+                                    .arg(typeValue, 2, 16, QLatin1Char('0'))
+                                    .arg(flagValue, 2, 16, QLatin1Char('0'))
+                                    .arg(frame.size());
         return false;
     }
 

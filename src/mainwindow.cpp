@@ -1,4 +1,4 @@
-﻿#include "inc/mainwindow.h"
+#include "inc/mainwindow.h"
 #include "ui_mainwindow.h"
 
 
@@ -6,6 +6,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , commManager(new CommunicationManager(this))
+    , upgradeManager(new UpgradeManager(this))
     , isConnected(false)
 {
     ui->setupUi(this);
@@ -29,6 +30,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(commManager, &CommunicationManager::tcpError, this, &MainWindow::handleTcpError);
     connect(commManager, &CommunicationManager::connectionStateChanged, this, &MainWindow::handleConnectionStateChanged);
 
+    // 连接升级管理器的信号
+    connect(upgradeManager, &UpgradeManager::sendData, this, &MainWindow::sendData);
+    connect(upgradeManager, &UpgradeManager::showInfo, this, &MainWindow::appendInfoDisplay);
+    connect(upgradeManager, &UpgradeManager::progressUpdated, this, &MainWindow::onUpgradeProgressUpdated);
+    connect(upgradeManager, &UpgradeManager::upgradeFinished, this, &MainWindow::onUpgradeFinished);
+
     updateUiForLinkSelection(ui->link->currentIndex());
     statusBar()->showMessage(tr("未连接"));
 
@@ -45,13 +52,27 @@ MainWindow::~MainWindow()
 }
 
 /* ===============================  通信函数 ======================================= */
-void MainWindow::handleDataReceived(const QByteArray &frame, quint8 slaveId,  BootLoaderProtocol::MessageType, BootLoaderProtocol::ResponseFlag flag, const QByteArray &/*payload*/)
+void MainWindow::handleDataReceived(const QByteArray &frame, quint8 slaveId, BootLoaderProtocol::MessageType msgType, BootLoaderProtocol::ResponseFlag flag, const QByteArray &payload)
 {
     const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
 
-    // info_display 只显示 ResponseFlag 的描述
-    QString flagStr = BootLoaderProtocol::getResponseDescription(flag);
-    appendInfoDisplay(QStringLiteral("[%1] 接收: %2").arg(timestamp, flagStr));
+    const QString typeDesc = BootLoaderProtocol::getMessageTypeDescription(msgType);
+    const QString flagDesc = BootLoaderProtocol::getResponseDescription(flag);
+
+    // 只显示getResponseDescription的内容，但SUCCESS和FAILED不显示
+    if (flag != BootLoaderProtocol::ResponseFlag::SUCCESS &&
+        flag != BootLoaderProtocol::ResponseFlag::FAILED) {
+        QString infoLine = QStringLiteral("[%1] %2")
+            .arg(timestamp, flagDesc);
+        appendInfoDisplay(infoLine);
+    }
+
+    const bool hasPayload = !payload.isEmpty();
+    QString payloadPreview;
+    if (hasPayload) {
+        payloadPreview = toPrintable(payload);
+        appendInfoDisplay(QString("    数据: %1").arg(payloadPreview));
+    }
 
     // 如果勾选了日志记录，写入详细信息
     if (ui->checkBox_log->isChecked()) {
@@ -62,12 +83,23 @@ void MainWindow::handleDataReceived(const QByteArray &frame, quint8 slaveId,  Bo
             hexData += " ...";
         }
 
-        // 格式: [时间] | RX | ID=xx | TYPE=描述 | DATA=十六进制
-        writeToLogFile(QStringLiteral("[%1] | RX | ID=%2 | TYPE=%3 | DATA=%4")
+        // 格式: [时间] | RX | ID=xx | TYPE=类型描述 | FLAG=标志描述 | DATA=十六进制
+        writeToLogFile(QStringLiteral("[%1] | RX | ID=%2 | TYPE=%3 | FLAG=%4 | DATA=%5")
             .arg(timestamp)
             .arg(slaveId, 2, 10, QLatin1Char('0'))
-            .arg(flagStr.leftJustified(16, ' ', true))
+            .arg(typeDesc.leftJustified(14, QLatin1Char(' ')))
+            .arg(flagDesc.leftJustified(18, QLatin1Char(' ')))
             .arg(hexData));
+
+        if (hasPayload) {
+            writeToLogFile(QStringLiteral("  PAYLOAD: %1").arg(payloadPreview));
+        }
+    }
+
+    // 如果正在升级流程中，处理响应（调试报文除外）
+    if (upgradeManager->currentState() != UpgradeManager::UpgradeState::IDLE &&
+        msgType != BootLoaderProtocol::MessageType::DEBUG_INFO) {
+        upgradeManager->handleResponse(msgType, flag, payload);
     }
 }
 
@@ -75,7 +107,9 @@ void MainWindow::handleSerialError(const QString &errorMessage)
 {
     const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
     const QString message = tr("串口错误：%1").arg(errorMessage);
-    appendInfoDisplay(QStringLiteral("[%1] 错误: %2").arg(timestamp, message));
+    appendInfoDisplay(QString("[%1] 错误: %2").arg(timestamp, message));
+    statusBar()->showMessage(message);
+    ui->pushButton_LJ->setEnabled(true);
     QMessageBox::critical(this, tr("串口错误"), message);
 }
 
@@ -83,15 +117,43 @@ void MainWindow::handleTcpError(const QString &errorMessage)
 {
     const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
     const QString message = tr("网口错误：%1").arg(errorMessage);
-    appendInfoDisplay(QStringLiteral("[%1] 错误: %2").arg(timestamp, message));
+    appendInfoDisplay(QString("[%1] 错误: %2").arg(timestamp, message));
+    statusBar()->showMessage(message);
+    ui->pushButton_LJ->setEnabled(true);
     QMessageBox::critical(this, tr("网口错误"), message);
 }
 
 void MainWindow::handleConnectionStateChanged(bool connected)
 {
+    const bool wasConnected = isConnected;
     isConnected = connected;
-    if (!connected) {
-        applyConnectedState(false, tr("未连接"));
+    ui->pushButton_LJ->setEnabled(true);
+
+    const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+
+    if (connected) {
+        QString statusMessage;
+        if (commManager->getActiveLink() == CommunicationManager::LinkType::Serial) {
+            QString portLabel = ui->portName->currentText();
+            if (portLabel.isEmpty()) {
+                portLabel = ui->portName->currentData().toString();
+            }
+            if (portLabel.isEmpty()) {
+                portLabel = tr("串口");
+            }
+            statusMessage = tr("串口已连接: %1").arg(portLabel);
+        } else {
+            statusMessage = tr("网口已连接: %1:%2")
+                                .arg(ui->lineEdit_IP->text().trimmed())
+                                .arg(ui->lineEdit_port->text().trimmed());
+        }
+
+        appendInfoDisplay(QStringLiteral("[%1] %2").arg(timestamp, statusMessage));
+        applyConnectedState(true, statusMessage);
+    } else {
+        const QString statusMessage = wasConnected ? tr("连接已断开") : tr("连接未建立");
+        appendInfoDisplay(QStringLiteral("[%1] %2").arg(timestamp, statusMessage));
+        applyConnectedState(false, statusMessage);
     }
 }
 
@@ -160,9 +222,9 @@ bool MainWindow::openSerialPort()
 
     const QString parityText = ui->parity->currentText();
     QSerialPort::Parity parity = QSerialPort::NoParity;
-    if (parityText.contains(QLatin1String("Even"), Qt::CaseInsensitive) || parityText.contains(QStringLiteral("偶"))) {
+    if (parityText.contains(QLatin1String("Even"), Qt::CaseInsensitive) || parityText.contains(QString("偶"))) {
         parity = QSerialPort::EvenParity;
-    } else if (parityText.contains(QLatin1String("Odd"), Qt::CaseInsensitive) || parityText.contains(QStringLiteral("奇"))) {
+    } else if (parityText.contains(QLatin1String("Odd"), Qt::CaseInsensitive) || parityText.contains(QString("奇"))) {
         parity = QSerialPort::OddParity;
     } else if (parityText.contains(QLatin1String("Space"), Qt::CaseInsensitive)) {
         parity = QSerialPort::SpaceParity;
@@ -172,13 +234,15 @@ bool MainWindow::openSerialPort()
 
     // 使用通信管理器打开串口
     if (commManager->openSerialPort(portName, baudRate, dataBits, stopBits, parity)) {
-        const QString message = tr("串口已连接: %1").arg(portName);
-        appendInfoDisplay(QStringLiteral("[%1] %2").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), message));
-        applyConnectedState(true, message);
+        const QString message = tr("正在连接串口: %1").arg(portName);
+        appendInfoDisplay(QStringLiteral("[%1] %2")
+                              .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), message));
+        statusBar()->showMessage(message);
         return true;
-    } else {
-        return false;
     }
+
+    statusBar()->showMessage(tr("串口连接失败"));
+    return false;
 }
 
 // 打开网口连接
@@ -202,34 +266,22 @@ bool MainWindow::openTcpSocket()
 
     // 使用通信管理器打开网口
     if (commManager->openTcpConnection(host, port)) {
-        const QString message = tr("网口已连接: %1:%2").arg(address.toString()).arg(port);
-        appendInfoDisplay(QStringLiteral("[%1] %2").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), message));
-        applyConnectedState(true, message);
+        const QString message = tr("正在连接: %1:%2").arg(address.toString()).arg(port);
+        appendInfoDisplay(QStringLiteral("[%1] %2")
+                              .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), message));
+        statusBar()->showMessage(message);
         return true;
-    } else {
-        return false;
     }
+
+    statusBar()->showMessage(tr("网口连接失败"));
+    return false;
 }
 
 // 关闭当前连接
 void MainWindow::closeConnection()
 {
-    if (!isConnected) {
-        return;
-    }
-
-    // 使用通信管理器关闭连接
-    if (commManager->getActiveLink() == CommunicationManager::LinkType::Serial) {
-        commManager->closeSerialPort();
-        const QString message = tr("串口已断开");
-        appendInfoDisplay(QStringLiteral("[%1] %2").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), message));
-        applyConnectedState(false, message);
-    } else {
-        commManager->closeTcpConnection();
-        const QString message = tr("网口已断开");
-        appendInfoDisplay(QStringLiteral("[%1] %2").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"), message));
-        applyConnectedState(false, message);
-    }
+    commManager->closeSerialPort();
+    commManager->closeTcpConnection();
 }
 
 // 发送数据（串口或网口）
@@ -247,13 +299,13 @@ void MainWindow::sendData(const QByteArray &data, const QString &description)
     if (bytesWritten > 0) {
         // 显示到 info_display
         if (!description.isEmpty()) {
-            appendInfoDisplay(QStringLiteral("[%1] 发送: %2").arg(timestamp, description));
+            appendInfoDisplay(QString("[%1] 发送: %2").arg(timestamp, description));
         }
 
-        // 如果勾选了日志记录，写入文件
+        // 如果勾选了日志记录,写入文件
         if (ui->checkBox_log->isChecked()) {
             QByteArray displayData = data.size() > 20 ? data.left(20) : data;   // 限制显示前20个字节
-            QString hexData = QString::fromLatin1(displayData.toHex(' '));
+            QString hexData = QString::fromLatin1(displayData.toHex(' ').toUpper());
             if (data.size() > 20) {
                 hexData += " ...";
             }
@@ -268,13 +320,13 @@ void MainWindow::sendData(const QByteArray &data, const QString &description)
             writeToLogFile(QStringLiteral("[%1] | TX | ID=%2 | TYPE=%3 | DATA=%4")
                 .arg(timestamp)
                 .arg(deviceId, 2, 10, QLatin1Char('0'))
-                .arg(typeStr.leftJustified(16, ' ', true))
+                .arg(typeStr.leftJustified(16, QLatin1Char(' ')))
                 .arg(hexData));
         }
     } else {
-        appendInfoDisplay(QStringLiteral("[%1] 发送失败").arg(timestamp));
+        appendInfoDisplay(QString("[%1] 发送失败").arg(timestamp));
         if (ui->checkBox_log->isChecked()) {
-            writeToLogFile(QStringLiteral("[%1] | TX | 发送失败").arg(timestamp));
+            writeToLogFile(QString("[%1] | TX | 发送失败").arg(timestamp));
         }
     }
 }
@@ -294,6 +346,43 @@ void MainWindow::selectFirmwareFile(QLineEdit *lineEdit, QCheckBox *checkBox, co
         lineEdit->setText(filePath);
         checkBox->setChecked(true);
     }
+}
+
+QString MainWindow::toPrintable(const QByteArray &data) const
+{
+    if (data.isEmpty()) {
+        return tr("无数据");
+    }
+
+    static constexpr int maxBytes = 64;
+    QString result;
+    result.reserve(qMin(data.size(), maxBytes) * 3);
+
+    int count = 0;
+    for (unsigned char ch : data) {
+        if (count >= maxBytes) {
+            result.append(QStringLiteral(" ..."));
+            break;
+        }
+
+        if (ch >= 0x20 && ch <= 0x7E) {
+            result.append(QChar(ch));
+        } else if (ch == '\r') {
+            result.append(QStringLiteral("\\r"));
+        } else if (ch == '\n') {
+            result.append(QStringLiteral("\\n"));
+        } else if (ch == '\t') {
+            result.append(QStringLiteral("\\t"));
+        } else {
+            result.append(QStringLiteral("\\x%1")
+                              .arg(static_cast<quint8>(ch), 2, 16, QLatin1Char('0'))
+                              .toUpper());
+        }
+
+        ++count;
+    }
+
+    return result;
 }
 
 // 根据连接状态，刷新按键文本
@@ -324,12 +413,12 @@ void MainWindow::updateUiForLinkSelection(int index)
     ui->dataBits->setEnabled(serialSelected && !isConnected);
     ui->stopBits->setEnabled(serialSelected && !isConnected);
     ui->parity->setEnabled(serialSelected && !isConnected);
-    ui->mode->setEnabled(serialSelected && !isConnected);
+    ui->lineEdit_mode->setEnabled(serialSelected && !isConnected);
 
     ui->lineEdit_IP->setEnabled(!serialSelected && !isConnected);
     ui->lineEdit_port->setEnabled(!serialSelected && !isConnected);
 
-    ui->size->setEnabled(!isConnected);
+    ui->lineEdit_size->setEnabled(!isConnected);
 
     if (serialSelected && ui->portName->count() == 0) {
         populateSerialPorts();  // 枚举可用串口
@@ -360,6 +449,28 @@ void MainWindow::writeToLogFile(const QString &text)
     }
 }
 
+// 获取从机ID
+quint8 MainWindow::getSlaveId() const
+{
+    if (ui->link->currentIndex() == 0) {
+        // 串口模式，从mode获取
+        bool ok = false;
+        int id = ui->lineEdit_mode->text().toInt(&ok);
+        return ok ? static_cast<quint8>(id) : 1;
+    } else {
+        // 网口模式，从IP最后一段获取
+        QString ip = ui->lineEdit_IP->text();
+        QStringList parts = ip.split('.');
+        if (parts.size() == 4) {
+            bool ok = false;
+            int lastByte = parts[3].toInt(&ok);
+            if (ok && lastByte >= 0 && lastByte <= 255) {
+                return static_cast<quint8>(lastByte);
+            }
+        }
+        return 1; // 默认值
+    }
+}
 
 /* ===============================  按键函数 ======================================= */
 // 选择 FPGA 固件文件
@@ -401,17 +512,46 @@ void MainWindow::on_pushButton_LJ_clicked()
         closeConnection();
         return;
     }
+
+    ui->pushButton_LJ->setEnabled(false);
+
     const bool serialSelected = (ui->link->currentIndex() == 0);
     const bool opened = serialSelected ? openSerialPort() : openTcpSocket();
     if (!opened) {
         applyConnectedState(false, tr("未连接"));
+        ui->pushButton_LJ->setEnabled(true);
     }
 }
 
 // 升级
 void MainWindow::on_pushButton_SJ_clicked()
 {
+    if (!isConnected) {
+        QMessageBox::warning(this, tr("升级"), tr("请先连接设备！"));
+        return;
+    }
 
+    // 获取数据包大小
+    bool ok = false;
+    int packetSize = ui->lineEdit_size->text().toInt(&ok);
+
+    // 获取从机ID
+    quint8 slaveId = getSlaveId();
+
+    // 开始升级流程
+    bool started = upgradeManager->startUpgrade(
+        slaveId, packetSize,
+        ui->checkBox_FPGA->isChecked(), ui->checkBox_DSP1->isChecked(),
+        ui->checkBox_DSP2->isChecked(), ui->checkBox_ARM->isChecked(),
+        ui->lineEdit_FPGA->text(), ui->lineEdit_DSP1->text(),
+        ui->lineEdit_DSP2->text(), ui->lineEdit_ARM->text()
+    );
+
+    if (started) {
+        ui->pushButton_SJ->setEnabled(false);
+        ui->progressBar_DQ->setValue(0);
+        ui->progressBar_ZT->setValue(0);
+    }
 }
 
 // 通信方式选择
@@ -425,5 +565,29 @@ void MainWindow::on_link_currentIndexChanged(int index)
         statusBar()->showMessage(tr("已选择串口模式"));
     } else {
         statusBar()->showMessage(tr("已选择网口模式"));
+    }
+}
+
+
+/* =============================== 升级管理器信号槽 ======================================= */
+//升级进度更新
+void MainWindow::onUpgradeProgressUpdated(int currentDevice, int totalDevice)
+{
+    ui->progressBar_DQ->setValue(currentDevice);
+    ui->progressBar_ZT->setValue(totalDevice);
+}
+
+// 升级完成
+void MainWindow::onUpgradeFinished(bool success, const QString &message)
+{
+    ui->pushButton_SJ->setEnabled(true);
+
+    if (success) {
+        ui->progressBar_ZT->setValue(100);
+        statusBar()->showMessage(tr("升级成功"));
+        QMessageBox::information(this, tr("升级"), tr("升级完成！\n%1").arg(message));
+    } else {
+        statusBar()->showMessage(tr("升级失败"));
+        QMessageBox::critical(this, tr("升级失败"), message);
     }
 }
