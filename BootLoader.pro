@@ -1,5 +1,5 @@
 # Qt模块配置
-QT += core gui widgets serialport
+QT += core gui widgets serialport network
 
 # C++标准
 CONFIG += c++17
@@ -12,11 +12,15 @@ RC_ICONS = ui/com.ico
 # 源文件
 SOURCES += \
     src/main.cpp \
-    src/mainwindow.cpp
+    src/mainwindow.cpp \
+    src/protocol.cpp \
+    src/communication.cpp
 
 # 头文件
 HEADERS += \
-    inc/mainwindow.h
+    inc/mainwindow.h \
+    inc/protocol.h \
+    inc/communication.h
 
 # UI文件
 FORMS += \

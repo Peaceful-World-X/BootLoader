@@ -6,19 +6,19 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1028</width>
-    <height>810</height>
+    <width>880</width>
+    <height>750</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Qt串口通信</string>
+   <string>BootLoader 下载器</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>15</y>
+      <y>5</y>
       <width>416</width>
       <height>646</height>
      </rect>
@@ -52,7 +52,14 @@
          </widget>
         </item>
         <item>
-         <widget class="QComboBox" name="portName"/>
+         <widget class="QComboBox" name="portName">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
@@ -73,6 +80,12 @@
         </item>
         <item>
          <widget class="QComboBox" name="dataBits">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <item>
            <property name="text">
             <string>8</string>
@@ -114,6 +127,12 @@
         </item>
         <item>
          <widget class="QComboBox" name="baudRate">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <item>
            <property name="text">
             <string>115200</string>
@@ -150,6 +169,12 @@
         </item>
         <item>
          <widget class="QComboBox" name="stopBits">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <item>
            <property name="text">
             <string>1</string>
@@ -181,6 +206,12 @@
         </item>
         <item>
          <widget class="QComboBox" name="parity">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <item>
            <property name="text">
             <string>NoParity</string>
@@ -238,7 +269,7 @@
           <property name="minimumSize">
            <size>
             <width>150</width>
-            <height>0</height>
+            <height>30</height>
            </size>
           </property>
           <property name="text">
@@ -277,7 +308,7 @@
           <property name="minimumSize">
            <size>
             <width>150</width>
-            <height>0</height>
+            <height>30</height>
            </size>
           </property>
           <property name="text">
@@ -313,6 +344,12 @@
         </item>
         <item>
          <widget class="QLineEdit" name="size">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <property name="text">
            <string>1024</string>
           </property>
@@ -346,6 +383,12 @@
         </item>
         <item>
          <widget class="QLineEdit" name="mode">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <property name="text">
            <string>0</string>
           </property>
@@ -379,6 +422,12 @@
         </item>
         <item>
          <widget class="QComboBox" name="link">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
           <item>
            <property name="text">
             <string>串口</string>
@@ -603,6 +652,19 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_log">
+          <property name="maximumSize">
+           <size>
+            <width>60</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>日志</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
      </layout>
@@ -612,20 +674,20 @@
     <property name="geometry">
      <rect>
       <x>445</x>
-      <y>15</y>
-      <width>561</width>
+      <y>5</y>
+      <width>416</width>
       <height>646</height>
      </rect>
     </property>
     <property name="title">
      <string>下载日志</string>
     </property>
-    <widget class="QTextBrowser" name="comLog">
+    <widget class="QTextBrowser" name="info_display">
      <property name="geometry">
       <rect>
        <x>10</x>
        <y>30</y>
-       <width>541</width>
+       <width>396</width>
        <height>606</height>
       </rect>
      </property>
@@ -635,9 +697,9 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>670</y>
-      <width>986</width>
-      <height>106</height>
+      <y>660</y>
+      <width>841</width>
+      <height>71</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_4">
