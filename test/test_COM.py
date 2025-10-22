@@ -362,7 +362,7 @@ def main():
     import sys
 
     # 默认参数
-    port = 'COM3'
+    port = 'COM2'
     baudrate = 115200
 
     # 解析命令行参数
