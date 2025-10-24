@@ -538,6 +538,9 @@ void MainWindow::on_pushButton_SJ_clicked()
     // 获取从机ID
     quint8 slaveId = getSlaveId();
 
+    // 自动清屏
+    ui->info_display->clear();
+
     // 开始升级流程
     bool started = upgradeManager->startUpgrade(
         slaveId, packetSize,
@@ -549,6 +552,7 @@ void MainWindow::on_pushButton_SJ_clicked()
 
     if (started) {
         ui->pushButton_SJ->setEnabled(false);
+        ui->pushButton_LJ->setEnabled(false);  // 升级过程中禁用断开按钮
         ui->progressBar_DQ->setValue(0);
         ui->progressBar_ZT->setValue(0);
     }
@@ -587,6 +591,7 @@ void MainWindow::onUpgradeProgressUpdated(int currentDevice, int totalDevice)
 void MainWindow::onUpgradeFinished(bool success, const QString &message)
 {
     ui->pushButton_SJ->setEnabled(true);
+    ui->pushButton_LJ->setEnabled(true);  // 升级完成后重新启用断开按钮
 
     if (success) {
         ui->progressBar_ZT->setValue(100);

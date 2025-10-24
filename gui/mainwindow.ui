@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>880</width>
-    <height>750</height>
+    <width>848</width>
+    <height>627</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,10 +17,10 @@
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>5</y>
+      <x>5</x>
+      <y>0</y>
       <width>416</width>
-      <height>646</height>
+      <height>206</height>
      </rect>
     </property>
     <property name="title">
@@ -32,7 +32,7 @@
        <x>15</x>
        <y>30</y>
        <width>181</width>
-       <height>196</height>
+       <height>171</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout">
@@ -56,7 +56,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
          </widget>
@@ -83,7 +83,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <item>
@@ -130,7 +130,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <item>
@@ -172,7 +172,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <item>
@@ -209,7 +209,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <item>
@@ -239,7 +239,7 @@
        <x>205</x>
        <y>30</y>
        <width>201</width>
-       <height>196</height>
+       <height>171</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -269,7 +269,7 @@
           <property name="minimumSize">
            <size>
             <width>150</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -308,7 +308,7 @@
           <property name="minimumSize">
            <size>
             <width>150</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -347,7 +347,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -386,7 +386,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -425,7 +425,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <item>
@@ -444,18 +444,145 @@
       </item>
      </layout>
     </widget>
+   </widget>
+   <widget class="QGroupBox" name="groupBox_5">
+    <property name="geometry">
+     <rect>
+      <x>425</x>
+      <y>0</y>
+      <width>416</width>
+      <height>551</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>下载日志</string>
+    </property>
+    <widget class="QTextBrowser" name="info_display">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>30</y>
+       <width>396</width>
+       <height>516</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton">
+     <property name="geometry">
+      <rect>
+       <x>345</x>
+       <y>520</y>
+       <width>56</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>clear</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="layoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>5</x>
+      <y>555</y>
+      <width>836</width>
+      <height>56</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout_4">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_16">
+       <item>
+        <widget class="QLabel" name="label_11">
+         <property name="minimumSize">
+          <size>
+           <width>50</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>80</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>当前进度:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QProgressBar" name="progressBar_DQ">
+         <property name="value">
+          <number>100</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_17">
+       <item>
+        <widget class="QLabel" name="label_12">
+         <property name="minimumSize">
+          <size>
+           <width>50</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>80</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>整体进度:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QProgressBar" name="progressBar_ZT">
+         <property name="value">
+          <number>100</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QGroupBox" name="groupBox">
+    <property name="geometry">
+     <rect>
+      <x>5</x>
+      <y>210</y>
+      <width>416</width>
+      <height>341</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>文件选择</string>
+    </property>
     <widget class="QWidget" name="layoutWidget_2">
      <property name="geometry">
       <rect>
-       <x>15</x>
-       <y>235</y>
-       <width>391</width>
-       <height>401</height>
+       <x>10</x>
+       <y>30</y>
+       <width>396</width>
+       <height>306</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_5">
       <item>
        <widget class="QCheckBox" name="checkBox_FPGA">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>20</height>
+         </size>
+        </property>
         <property name="text">
          <string>FPGA(*.rbf, *.bin)</string>
         </property>
@@ -468,7 +595,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -496,6 +623,12 @@
       </item>
       <item>
        <widget class="QCheckBox" name="checkBox_DSP1">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>20</height>
+         </size>
+        </property>
         <property name="text">
          <string>DSP1(*.hex, *.bin)</string>
         </property>
@@ -508,7 +641,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -536,6 +669,12 @@
       </item>
       <item>
        <widget class="QCheckBox" name="checkBox_DSP2">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>20</height>
+         </size>
+        </property>
         <property name="text">
          <string>DSP2(*.hex, *.bin)</string>
         </property>
@@ -548,7 +687,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -576,6 +715,12 @@
       </item>
       <item>
        <widget class="QCheckBox" name="checkBox_ARM">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>20</height>
+         </size>
+        </property>
         <property name="text">
          <string>ARM(*.hex, *.bin)</string>
         </property>
@@ -588,7 +733,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>30</height>
+            <height>20</height>
            </size>
           </property>
           <property name="text">
@@ -669,114 +814,6 @@
       </item>
      </layout>
     </widget>
-   </widget>
-   <widget class="QGroupBox" name="groupBox_5">
-    <property name="geometry">
-     <rect>
-      <x>445</x>
-      <y>5</y>
-      <width>416</width>
-      <height>646</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>下载日志</string>
-    </property>
-    <widget class="QTextBrowser" name="info_display">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>30</y>
-       <width>396</width>
-       <height>606</height>
-      </rect>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="pushButton">
-     <property name="geometry">
-      <rect>
-       <x>345</x>
-       <y>610</y>
-       <width>56</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>clear</string>
-     </property>
-    </widget>
-   </widget>
-   <widget class="QWidget" name="layoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>660</y>
-      <width>841</width>
-      <height>71</height>
-     </rect>
-    </property>
-    <layout class="QVBoxLayout" name="verticalLayout_4">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_16">
-       <item>
-        <widget class="QLabel" name="label_11">
-         <property name="minimumSize">
-          <size>
-           <width>50</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>80</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>当前进度:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QProgressBar" name="progressBar_DQ">
-         <property name="value">
-          <number>100</number>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_17">
-       <item>
-        <widget class="QLabel" name="label_12">
-         <property name="minimumSize">
-          <size>
-           <width>50</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>80</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>整体进度:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QProgressBar" name="progressBar_ZT">
-         <property name="value">
-          <number>100</number>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
    </widget>
   </widget>
  </widget>

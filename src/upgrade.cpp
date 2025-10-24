@@ -395,12 +395,20 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
                 }
 
                 if (msgType == expectedType) {
-                    if (flag == BootLoaderProtocol::ResponseFlag::ERASE_SUCCESS &&
+                    // 处理准备擦除Flash标志（0x09）
+                    if (flag == BootLoaderProtocol::ResponseFlag::PREPARE_ERASE) {
+                        emit showInfo(tr(">>> 准备擦除Flash..."));
+                        // 继续等待擦除成功的消息，不改变状态
+                    }
+                    // 处理擦除成功标志（0x0A）
+                    else if (flag == BootLoaderProtocol::ResponseFlag::ERASE_SUCCESS &&
                         !payload.isEmpty() && payload[0] == 0x00) {
                         emit showInfo(tr(">>> 擦除Flash成功，开始传输数据"));
                         sendUpgradeData();
-                    } else {
-                        upgradeComplete(false, tr("擦除Flash失败"));
+                    }
+                    else {
+                        const QString reason = BootLoaderProtocol::getResponseDescription(flag);
+                        upgradeComplete(false, tr("擦除Flash失败：%1").arg(reason));
                     }
                 }
             }
@@ -486,7 +494,8 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
                 }
 
                 if (msgType == expectedType) {
-                    const bool successFlag = (flag == BootLoaderProtocol::ResponseFlag::UPGRADE_END ||
+                    const bool successFlag = (flag == BootLoaderProtocol::ResponseFlag::SUCCESS ||
+                                              flag == BootLoaderProtocol::ResponseFlag::UPGRADE_END ||
                                               flag == BootLoaderProtocol::ResponseFlag::FPGA_CONFIG_SUCCESS);
 
                     if (successFlag) {
