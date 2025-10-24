@@ -75,6 +75,20 @@ public:
         FPGA_FLAG_WRITE_FAILED = 0x21, // 写FPGA固件标志位失败
         PACKET_SIZE_EXCEED = 0x22,   // 数据包大小超限
 
+        START_PROGRAM_FPGA = 0x23,   // 开始编程FPGA
+        RESERVED_0x24 = 0x24,        // 预留
+        RESERVED_0x25 = 0x25,        // 预留
+        RESERVED_0x26 = 0x26,        // 预留
+        RESERVED_0x27 = 0x27,        // 预留
+        RESERVED_0x28 = 0x28,        // 预留
+        RESERVED_0x29 = 0x29,        // 预留
+        RESERVED_0x2A = 0x2A,        // 预留
+        RESERVED_0x2B = 0x2B,        // 预留
+        RESERVED_0x2C = 0x2C,        // 预留
+        RESERVED_0x2D = 0x2D,        // 预留
+        RESERVED_0x2E = 0x2E,        // 预留
+        RESERVED_0x2F = 0x2F,        // 预留
+
         REQUEST_FLAG = 0xFE          // 请求标识
     };
 

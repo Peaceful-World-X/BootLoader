@@ -15,8 +15,8 @@ UpgradeManager::UpgradeManager(MainWindow *parent)
     , totalPackets(0)
     , sentPackets(0)
 {
-    // 设置10秒超时
-    upgradeTimer->setInterval(10000);
+    // 设置15秒超时
+    upgradeTimer->setInterval(15000);
     connect(upgradeTimer, &QTimer::timeout, this, &UpgradeManager::onTimeout);
 }
 
@@ -111,10 +111,12 @@ bool UpgradeManager::prepareFirmware(int packetSize, bool upgradeFPGA, bool upgr
             return false;
         }
 
-        info.packetSize = static_cast<quint16>(packetSize);
+        // FPGA固定使用1024字节分包，其他设备使用界面设置值
+        int actualPacketSize = (dev.type == DeviceType::FPGA) ? 1024 : packetSize;
+        info.packetSize = static_cast<quint16>(actualPacketSize);
 
         // 计算数据包总数
-        const quint32 computedPacketCount = (info.fileSize + packetSize - 1) / packetSize;
+        const quint32 computedPacketCount = (info.fileSize + actualPacketSize - 1) / actualPacketSize;
         if (computedPacketCount == 0 ||
             computedPacketCount > std::numeric_limits<quint16>::max()) {
             emit showInfo(tr(">>> 错误：%1 固件需要的数据包数量超出协议限制！").arg(dev.name));
@@ -219,7 +221,7 @@ void UpgradeManager::startDeviceUpgrade(DeviceType device)
         case DeviceType::ARM: deviceName = "ARM"; break;
     }
 
-    emit showInfo(tr("\n>>> 准备升级 %1").arg(deviceName));
+    emit showInfo(tr(">>> 准备升级 %1").arg(deviceName));
 
     firmwareList[currentFirmwareIndex].currentPacket = 0;
 
@@ -351,6 +353,20 @@ void UpgradeManager::sendTotalEnd()
  */
 void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, BootLoaderProtocol::ResponseFlag flag, const QByteArray &payload)
 {
+    // 处理调试信息 - 调试信息在任何状态下都应该显示
+    if (msgType == BootLoaderProtocol::MessageType::DEBUG_INFO) {
+        QString flagDesc = BootLoaderProtocol::getResponseDescription(flag);
+        emit showInfo(tr(">>> %1").arg(flagDesc));
+
+        // 调试信息不影响升级流程，继续等待正常响应
+        if (upgradeState != UpgradeState::IDLE &&
+            upgradeState != UpgradeState::UPGRADE_SUCCESS &&
+            upgradeState != UpgradeState::UPGRADE_FAILED) {
+            upgradeTimer->start();
+        }
+        return;
+    }
+
     // 重置超时
     upgradeTimer->stop();
     retryCount = 0;
@@ -500,7 +516,7 @@ void UpgradeManager::handleResponse(BootLoaderProtocol::MessageType msgType, Boo
 
                     if (successFlag) {
                         if (!payload.isEmpty() && static_cast<quint8>(payload[0]) == 0x00) {
-                            emit showInfo(tr(">>> 设备升级完成"));
+                            emit showInfo(tr(">>> 设备升级完成\n"));
 
                             // 升级下一个设备
                             DeviceType nextDevice = DeviceType::FPGA;
@@ -603,11 +619,11 @@ void UpgradeManager::upgradeComplete(bool success, const QString &message)
 
     if (success) {
         upgradeState = UpgradeState::UPGRADE_SUCCESS;
-        emit showInfo(tr("\n>>> 升级完成！%1").arg(message));
+        emit showInfo(tr(">>> 升级完成！%1").arg(message));
         emit showInfo(tr("========================================"));
     } else {
         upgradeState = UpgradeState::UPGRADE_FAILED;
-        emit showInfo(tr("\n>>> 升级失败：%1").arg(message));
+        emit showInfo(tr(">>> 升级失败：%1").arg(message));
         emit showInfo(tr("========================================"));
     }
 

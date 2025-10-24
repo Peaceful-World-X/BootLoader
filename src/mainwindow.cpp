@@ -551,8 +551,26 @@ void MainWindow::on_pushButton_SJ_clicked()
     );
 
     if (started) {
+        // 修改升级按钮文本和状态
+        ui->pushButton_SJ->setText(tr("正在升级"));
         ui->pushButton_SJ->setEnabled(false);
         ui->pushButton_LJ->setEnabled(false);  // 升级过程中禁用断开按钮
+
+        // 禁用文件选择区域
+        ui->checkBox_FPGA->setEnabled(false);
+        ui->checkBox_DSP1->setEnabled(false);
+        ui->checkBox_DSP2->setEnabled(false);
+        ui->checkBox_ARM->setEnabled(false);
+        ui->lineEdit_FPGA->setEnabled(false);
+        ui->lineEdit_DSP1->setEnabled(false);
+        ui->lineEdit_DSP2->setEnabled(false);
+        ui->lineEdit_ARM->setEnabled(false);
+        ui->pushButton_FPGA->setEnabled(false);
+        ui->pushButton_DSP1->setEnabled(false);
+        ui->pushButton_DSP2->setEnabled(false);
+        ui->pushButton_ARM->setEnabled(false);
+
+        // 重置进度条
         ui->progressBar_DQ->setValue(0);
         ui->progressBar_ZT->setValue(0);
     }
@@ -590,8 +608,24 @@ void MainWindow::onUpgradeProgressUpdated(int currentDevice, int totalDevice)
 // 升级完成
 void MainWindow::onUpgradeFinished(bool success, const QString &message)
 {
+    // 恢复升级按钮文本和状态
+    ui->pushButton_SJ->setText(tr("升级"));
     ui->pushButton_SJ->setEnabled(true);
     ui->pushButton_LJ->setEnabled(true);  // 升级完成后重新启用断开按钮
+
+    // 重新启用文件选择区域
+    ui->checkBox_FPGA->setEnabled(true);
+    ui->checkBox_DSP1->setEnabled(true);
+    ui->checkBox_DSP2->setEnabled(true);
+    ui->checkBox_ARM->setEnabled(true);
+    ui->lineEdit_FPGA->setEnabled(true);
+    ui->lineEdit_DSP1->setEnabled(true);
+    ui->lineEdit_DSP2->setEnabled(true);
+    ui->lineEdit_ARM->setEnabled(true);
+    ui->pushButton_FPGA->setEnabled(true);
+    ui->pushButton_DSP1->setEnabled(true);
+    ui->pushButton_DSP2->setEnabled(true);
+    ui->pushButton_ARM->setEnabled(true);
 
     if (success) {
         ui->progressBar_ZT->setValue(100);

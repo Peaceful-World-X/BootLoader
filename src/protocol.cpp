@@ -339,6 +339,19 @@ QString BootLoaderProtocol::getResponseDescription(ResponseFlag flag)
         case ResponseFlag::FPGA_CONFIG_FAILED: return "FPGA配置失败";
         case ResponseFlag::FPGA_FLAG_WRITE_FAILED: return "写FPGA固件标志位失败";
         case ResponseFlag::PACKET_SIZE_EXCEED: return "数据包大小超限";
+        case ResponseFlag::START_PROGRAM_FPGA: return "开始编程FPGA";
+        case ResponseFlag::RESERVED_0x24: return "预留";
+        case ResponseFlag::RESERVED_0x25: return "预留";
+        case ResponseFlag::RESERVED_0x26: return "预留";
+        case ResponseFlag::RESERVED_0x27: return "预留";
+        case ResponseFlag::RESERVED_0x28: return "预留";
+        case ResponseFlag::RESERVED_0x29: return "预留";
+        case ResponseFlag::RESERVED_0x2A: return "预留";
+        case ResponseFlag::RESERVED_0x2B: return "预留";
+        case ResponseFlag::RESERVED_0x2C: return "预留";
+        case ResponseFlag::RESERVED_0x2D: return "预留";
+        case ResponseFlag::RESERVED_0x2E: return "预留";
+        case ResponseFlag::RESERVED_0x2F: return "预留";
         case ResponseFlag::REQUEST_FLAG: return "请求标识";
         default: return QString("未知响应(0x%1)").arg(static_cast<quint8>(flag), 2, 16, QChar('0'));
     }
