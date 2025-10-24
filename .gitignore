@@ -1,4 +1,6 @@
 bin/
 build/
 *.pro.user
+*.docx
+*.doc
 __pycache__

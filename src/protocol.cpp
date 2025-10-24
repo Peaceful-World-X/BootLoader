@@ -68,9 +68,9 @@ QByteArray BootLoaderProtocol::buildMasterFrame(quint8 slaveId, MessageType type
     // CRC校验范围：帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N)
     quint16 crc = calculateCRC16(frame);
 
-    // CRC（高位在前）
-    frame.append(static_cast<char>((crc >> 8) & 0xFF));
-    frame.append(static_cast<char>(crc & 0xFF));
+    // CRC（低位在前，高位在后）
+    frame.append(static_cast<char>(crc & 0xFF));          // 低位
+    frame.append(static_cast<char>((crc >> 8) & 0xFF));   // 高位
 
     return frame;
 }
@@ -108,9 +108,10 @@ QByteArray BootLoaderProtocol::buildSlaveFrame(quint8 slaveId, MessageType type,
     // CRC校验范围：帧头(2) + ID(1) + 长度(2) + 类型(1) + 标识(1) + 数据(N)
     quint16 crc = calculateCRC16(frame);
 
-    // CRC（高位在前）
-    frame.append(static_cast<char>((crc >> 8) & 0xFF));
-    frame.append(static_cast<char>(crc & 0xFF));
+    // CRC（低位在前，高位在后）
+    frame.append(static_cast<char>(crc & 0xFF));          // 低位
+    frame.append(static_cast<char>((crc >> 8) & 0xFF));   // 高位
+
 
     return frame;
 }
@@ -272,8 +273,9 @@ bool BootLoaderProtocol::parseFrame(const QByteArray &frame, quint8 &slaveId, Me
     // 验证CRC（CRC校验范围：从帧头到数据结束，不包含最后2字节CRC）
     QByteArray crcData = frame.left(frame.size() - 2);
     quint16 calculatedCRC = calculateCRC16(crcData);
-    quint16 receivedCRC = (static_cast<quint8>(frame[frame.size() - 2]) << 8) |
-                          static_cast<quint8>(frame[frame.size() - 1]);
+    // 接收到的CRC：低位在前，高位在后
+    quint16 receivedCRC = static_cast<quint8>(frame[frame.size() - 2]) |
+                          (static_cast<quint8>(frame[frame.size() - 1]) << 8);
 
     if (calculatedCRC != receivedCRC) {
         const quint8 typeValue = frame.size() > 5 ? static_cast<quint8>(frame[5]) : 0x00;

@@ -92,7 +92,8 @@ class BootLoaderSerialServer:
 
         # 提取payload和CRC
         payload = data[7:-2]
-        received_crc = (data[-2] << 8) | data[-1]
+        # 接收到的CRC：低位在前，高位在后
+        received_crc = data[-2] | (data[-1] << 8)
 
         # 验证CRC
         crc_data = data[:-2]
@@ -127,10 +128,10 @@ class BootLoaderSerialServer:
         frame.append(flag)
         frame.extend(payload)
 
-        # 计算CRC
+        # 计算CRC（低位在前，高位在后）
         crc = self.calculate_crc16(frame)
-        frame.append((crc >> 8) & 0xFF)
-        frame.append(crc & 0xFF)
+        frame.append(crc & 0xFF)           # 低位
+        frame.append((crc >> 8) & 0xFF)    # 高位
 
         return bytes(frame)
 
