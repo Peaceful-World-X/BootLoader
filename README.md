@@ -14,6 +14,7 @@
 - 📦 **实时进度** - 显示升级进度和详细状态信息
 - 📝 **日志记录** - 完整的通信日志，便于调试和问题排查
 - 🔄 **智能重试** - 自动超时检测和重传机制
+<img width="1055" height="819" alt="image" src="https://github.com/user-attachments/assets/3f495990-18b1-497a-b281-ed3bb668ccc4" />
 
 ---
 
